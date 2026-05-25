@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🌿 台灣上市公司溫室氣體排放儀表板</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+  <style>
+    :root {
+      --bg-primary:    #0d1117;
+      --bg-card:       #161b22;
+      --bg-card2:      #1c2333;
+      --border:        #30363d;
+      --green-1:       #39d353;
+      --green-2:       #26a641;
+      --green-3:       #006d32;
+      --green-glow:    rgba(57,211,83,0.18);
+      --teal:          #00b4d8;
+      --amber:         #f59e0b;
+      --red:           #ef4444;
+      --purple:        #a78bfa;
+      --text-primary:  #e6edf3;
+      --text-secondary:#8b949e;
+      --text-muted:    #484f58;
+      --radius:        14px;
+      --shadow:        0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(57,211,83,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0,180,216,0.05) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 32px 24px 60px; }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 36px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-left h1 {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--green-1), var(--teal));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.3;
+    }
+    .header-left p {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .header-left p i { color: var(--green-2); }
+    .header-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 18px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+    .badge-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green-1);
+      box-shadow: 0 0 8px var(--green-1);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.5; transform:scale(1.3); }
+    }
+
+    /* ── KPI Cards ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform .2s, box-shadow .2s;
+      cursor: default;
+    }
+    .kpi-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .kpi-card.green::before  { background: linear-gradient(90deg, var(--green-1), var(--green-2)); }
+    .kpi-card.teal::before   { background: linear-gradient(90deg, var(--teal), #0077b6); }
+    .kpi-card.amber::before  { background: linear-gradient(90deg, var(--amber), #d97706); }
+    .kpi-card.purple::before { background: linear-gradient(90deg, var(--purple), #7c3aed); }
+    .kpi-card.red::before    { background: linear-gradient(90deg, var(--red), #b91c1c); }
+    .kpi-card.blue::before   { background: linear-gradient(90deg, #60a5fa, #2563eb); }
+
+    .kpi-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+    }
+    .kpi-card.green  .kpi-icon { background: rgba(57,211,83,.15);  color: var(--green-1); }
+    .kpi-card.teal   .kpi-icon { background: rgba(0,180,216,.15);  color: var(--teal); }
+    .kpi-card.amber  .kpi-icon { background: rgba(245,158,11,.15); color: var(--amber); }
+    .kpi-card.purple .kpi-icon { background: rgba(167,139,250,.15);color: var(--purple); }
+    .kpi-card.red    .kpi-icon { background: rgba(239,68,68,.15);  color: var(--red); }
+    .kpi-card.blue   .kpi-icon { background: rgba(96,165,250,.15); color: #60a5fa; }
+
+    .kpi-label { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .kpi-value { font-size: 1.55rem; font-weight: 700; line-height: 1.1; }
+    .kpi-unit  { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Controls ── */
+    .controls-bar {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .controls-bar label { font-size: 0.82rem; color: var(--text-secondary); white-space: nowrap; }
+    .slider-wrap { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 200px; }
+    input[type=range] {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--green-1);
+      box-shadow: 0 0 8px var(--green-glow);
+      cursor: pointer;
+      transition: transform .15s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    .slider-val {
+      min-width: 36px;
+      text-align: center;
+      font-weight: 700;
+      color: var(--green-1);
+      font-size: 1rem;
+    }
+    .btn-update {
+      display: flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, var(--green-2), var(--green-3));
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 22px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s, transform .15s;
+      font-family: inherit;
+    }
+    .btn-update:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-update:active { transform: translateY(0); }
+
+    /* ── Tab Nav ── */
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      flex: 1;
+      min-width: 110px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 16px;
+      border-radius: 9px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.83rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .2s;
+      font-family: inherit;
+    }
+    .tab-btn:hover { background: var(--bg-card2); color: var(--text-primary); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--green-3), #004d22);
+      color: var(--green-1);
+      box-shadow: 0 0 12px var(--green-glow);
+    }
+
+    /* ── Chart panels ── */
+    .chart-panel { display: none; }
+    .chart-panel.active { display: block; }
+
+    .chart-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      box-shadow: var(--shadow);
+    }
+    .chart-card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .chart-card h2 i { color: var(--green-1); font-size: .9rem; }
+    .chart-card p.sub {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 22px;
+    }
+    .chart-wrap { position: relative; width: 100%; height: 420px; }
+
+    /* ── Two-col layout for pie + bar ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead tr { background: var(--bg-card2); }
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-primary);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg-card2); }
+    .rank-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .rank-1 { background: rgba(245,158,11,.2); color: var(--amber); }
+    .rank-2 { background: rgba(148,163,184,.15); color: #94a3b8; }
+    .rank-3 { background: rgba(180,120,60,.15); color: #cd7f32; }
+    .rank-n { background: var(--bg-card2); color: var(--text-muted); }
+
+    .bar-inline {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .bar-bg {
+      flex: 1; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--green-2), var(--green-1));
+      transition: width .6s ease;
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 48px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 0.73rem;
+      color: var(--text-muted);
+    }
+    footer a { color: var(--green-2); text-decoration: none; }
+    footer a:hover { color: var(--green-1); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ── Header ── -->
+  <header>
+    <div class="header-left">
+      <h1>🌿 台灣上市公司溫室氣體排放儀表板</h1>
+      <p>
+        <i class="fa-solid fa-database fa-xs"></i>
+        資料來源：證交所 MOPS Open Data（t187ap46_L）｜單位：公噸 CO₂e
+      </p>
+    </div>
+    <div class="header-badge">
+      <div class="badge-dot"></div>
+      即時數據 · 2024 年報
+    </div>
+  </header>
+
+  <!-- ── KPI Cards ── -->
+  <div class="kpi-grid">
+    <div class="kpi-card green">
+      <div class="kpi-icon"><i class="fa-solid fa-industry"></i></div>
+      <div class="kpi-label">範疇一總排放</div>
+      <div class="kpi-value">175.25</div>
+      <div class="kpi-unit">百萬噸 CO₂e</div>
+    </div>
+    <div class="kpi-card teal">
+      <div class="kpi-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="kpi-label">範疇二總排放</div>
+      <div class="kpi-value">31.67</div>
+      <div class="kpi-unit">百萬噸 CO₂e</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-icon"><i class="fa-solid fa-link"></i></div>
+      <div class="kpi-label">範疇三總排放</div>
+      <div class="kpi-value">144.42</div>
+      <div class="kpi-unit">百萬噸 CO₂e</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-icon"><i class="fa-solid fa-ruler-combined"></i></div>
+      <div class="kpi-label">平均排放密集度</div>
+      <div class="kpi-value">70.1</div>
+      <div class="kpi-unit">噸 / 百萬元</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-icon"><i class="fa-solid fa-building"></i></div>
+      <div class="kpi-label">資料庫公司總數</div>
+      <div class="kpi-value">655</div>
+      <div class="kpi-unit">家上市公司</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-icon"><i class="fa-solid fa-trophy"></i></div>
+      <div class="kpi-label">最高排放企業</div>
+      <div class="kpi-value" style="font-size:1.1rem;">1101 台泥</div>
+      <div class="kpi-unit">範疇一最高</div>
+    </div>
+  </div>
+
+  <!-- ── Controls ── -->
+  <div class="controls-bar">
+    <label><i class="fa-solid fa-sliders" style="color:var(--green-1);margin-right:6px;"></i>顯示前 N 家公司（依範疇一排放量排序）</label>
+    <div class="slider-wrap">
+      <span style="font-size:.75rem;color:var(--text-muted);">5</span>
+      <input type="range" id="topN" min="5" max="50" step="5" value="10" oninput="updateSlider(this.value)"/>
+      <span style="font-size:.75rem;color:var(--text-muted);">50</span>
+      <div class="slider-val" id="sliderVal">10</div>
+    </div>
+    <button class="btn-update" onclick="renderAllCharts()">
+      <i class="fa-solid fa-rotate-right"></i> 更新圖表
+    </button>
+  </div>
+
+  <!-- ── Tab Nav ── -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('pie',this)">
+      <i class="fa-solid fa-chart-pie"></i> 圓餅圖
+    </button>
+    <button class="tab-btn" onclick="switchTab('bar',this)">
+      <i class="fa-solid fa-chart-bar"></i> 柱狀圖
+    </button>
+    <button class="tab-btn" onclick="switchTab('line',this)">
+      <i class="fa-solid fa-chart-line"></i> 折線圖
+    </button>
+    <button class="tab-btn" onclick="switchTab('sunburst',this)">
+      <i class="fa-solid fa-circle-dot"></i> 旭日圖
+    </button>
+    <button class="tab-btn" onclick="switchTab('table',this)">
+      <i class="fa-solid fa-table"></i> 排行榜
+    </button>
+  </div>
+
+  <!-- ── Pie Panel ── -->
+  <div class="chart-panel active" id="panel-pie">
+    <div class="two-col">
+      <div class="chart-card">
+        <h2><i class="fa-solid fa-chart-pie"></i> 範疇一排放佔比（前 N 家）</h2>
+        <p class="sub">各企業直接排放量相對比例</p>
+        <div class="chart-wrap"><canvas id="pieChart1"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h2><i class="fa-solid fa-chart-pie"></i> 三大範疇總量比較</h2>
+        <p class="sub">範疇一 / 二 / 三 全體佔比</p>
+        <div class="chart-wrap"><canvas id="pieChart2"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Bar Panel ── -->
+  <div class="chart-panel" id="panel-bar">
+    <div class="chart-card">
+      <h2><i class="fa-solid fa-chart-bar"></i> 前 N 家企業排放量比較</h2>
+      <p class="sub">範疇一、二、三並列柱狀圖（百萬噸 CO₂e）</p>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Line Panel ── -->
+  <div class="chart-panel" id="panel-line">
+    <div class="chart-card">
+      <h2><i class="fa-solid fa-chart-line"></i> 排放密集度趨勢（前 N 家）</h2>
+      <p class="sub">噸 CO₂e / 百萬元營收</p>
+      <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ── Sunburst Panel ── -->
+  <div class="chart-panel" id="panel-sunburst">
+    <div class="chart-card">
+      <h2><i class="fa-solid fa-circle-dot"></i> 旭日圖：產業 × 範疇分佈</h2>
+      <p class="sub">點擊可展開各層級</p>
+      <div id="sunburstChart" style="width:100%;height:480px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Table Panel ── -->
+  <div class="chart-panel" id="panel-table">
+    <div class="chart-card">
+      <h2><i class="fa-solid fa-table"></i> 排放量排行榜</h2>
+      <p class="sub">依範疇一排放量由高至低排序</p>
+      <div class="table-wrap">
+        <table id="rankTable">
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>股票代號</th>
+              <th>公司名稱</th>
+              <th>範疇一（萬噸）</th>
+              <th>範疇二（萬噸）</th>
+              <th>範疇三（萬噸）</th>
+              <th>密集度（噸/百萬元）</th>
+              <th>佔比</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <span>© 2024 ESG Dashboard · 資料來源：<a href="https://mops.twse.com.tw" target="_blank">證交所 MOPS</a></span>
+    <span>原始應用：<a href="https://stsfew-esg.hf.space" target="_blank">stsfew/esg @ Hugging Face Spaces</a></span>
+    <span>Built with Chart.js · Plotly.js · Font Awesome</span>
+  </footer>
+
+</div><!-- /wrapper -->
+
+<script>
+// ─────────────────────────────────────────────
+//  Mock Data（模擬真實排放數據）
+// ─────────────────────────────────────────────
+const ALL_COMPANIES = [
+  { code:'1101', name:'台泥',     s1:4821, s2:312, s3:1840, intensity:142.3 },
+  { code:'1102', name:'亞泥',     s1:3654, s2:287, s3:1320, intensity:128.7 },
+  { code:'2002', name:'中鋼',     s1:3210, s2:891, s3:2100, intensity:98.4  },
+  { code:'6505', name:'台塑化',   s1:2980, s2:540, s3:3200, intensity:76.2  },
+  { code:'1301', name:'台塑',     s1:2750, s2:480, s3:2900, intensity:72.1  },
+  { code:'1303', name:'南亞',     s1:2430, s2:410, s3:2600, intensity:68.5  },
+  { code:'1326', name:'台化',     s1:2210, s2:390, s3:2400, intensity:65.3  },
+  { code:'2317', name:'鴻海',     s1:1980, s2:1240, s3:8900, intensity:18.2 },
+  { code:'2330', name:'台積電',   s1:1750, s2:2100, s3:4200, intensity:12.4 },
+  { code:'2412', name:'中華電',   s1:1540, s2:890,  s3:1200, intensity:45.6 },
+  { code:'2303', name:'聯電',     s1:1320, s2:1560, s3:980,  intensity:22.1 },
+  { code:'3711', name:'日月光',   s1:1180, s2:980,  s3:760,  intensity:19.8 },
+  { code:'2882', name:'國泰金',   s1:980,  s2:340,  s3:2100, intensity:8.4  },
+  { code:'2881', name:'富邦金',   s1:870,  s2:290,  s3:1980, intensity:7.2  },
+  { code:'1216', name:'統一',     s1:760,  s2:210,  s3:1540, intensity:32.1 },
+  { code:'2308', name:'台達電',   s1:680,  s2:540,  s3:1200, intensity:14.3 },
+  { code:'2454', name:'聯發科',   s1:520,  s2:380,  s3:890,  intensity:6.8  },
+  { code:'2891', name:'中信金',   s1:480,  s2:210,  s3:1650, intensity:6.2  },
+  { code:'2886', name:'兆豐金',   s1:420,  s2:180,  s3:1420, intensity:5.8  },
+  { code:'2884', name:'玉山金',   s1:380,  s2:160,  s3:1280, intensity:5.1  },
+  { code:'2892', name:'第一金',   s1:340,  s2:140,  s3:1180, intensity:4.9  },
+  { code:'5880', name:'合庫金',   s1:310,  s2:130,  s3:1090, intensity:4.6  },
+  { code:'2885', name:'元大金',   s1:290,  s2:120,  s3:980,  intensity:4.2  },
+  { code:'2880', name:'華南金',   s1:270,  s2:110,  s3:920,  intensity:3.9  },
+  { code:'2883', name:'開發金',   s1:250,  s2:100,  s3:860,  intensity:3.6  },
+  { code:'2887', name:'台新金',   s1:230,  s2:95,   s3:810,  intensity:3.4  },
+  { code:'2890', name:'永豐金',   s1:210,  s2:88,   s3:760,  intensity:3.1  },
+  { code:'2888', name:'新光金',   s1:195,  s2:82,   s3:720,  intensity:2.9  },
+  { code:'2889', name:'國票金',   s1:180,  s2:76,   s3:680,  intensity:2.7  },
+  { code:'1402', name:'遠東新',   s1:165,  s2:70,   s3:640,  intensity:28.4 },
+  { code:'2207', name:'和泰車',   s1:150,  s2:65,   s3:600,  intensity:12.1 },
+  { code:'2912', name:'統一超',   s1:138,  s2:60,   s3:560,  intensity:9.8  },
+  { code:'2801', name:'彰銀',     s1:125,  s2:55,   s3:520,  intensity:2.4  },
+  { code:'1504', name:'東元',     s1:112,  s2:50,   s3:480,  intensity:18.7 },
+  { code:'2105', name:'正新',     s1:102,  s2:46,   s3:440,  intensity:22.3 },
+  { code:'2049', name:'上銀',     s1:94,   s2:42,   s3:400,  intensity:15.6 },
+  { code:'6415', name:'矽力-KY', s1:86,   s2:38,   s3:360,  intensity:4.2  },
+  { code:'3034', name:'聯詠',     s1:78,   s2:34,   s3:320,  intensity:3.8  },
+  { code:'2379', name:'瑞昱',     s1:71,   s2:31,   s3:290,  intensity:3.5  },
+  { code:'3008', name:'大立光',   s1:64,   s2:28,   s3:260,  intensity:5.2  },
+  { code:'2382', name:'廣達',     s1:58,   s2:25,   s3:230,  intensity:2.1  },
+  { code:'2357', name:'華碩',     s1:52,   s2:22,   s3:200,  intensity:2.8  },
+  { code:'2353', name:'宏碁',     s1:47,   s2:20,   s3:180,  intensity:2.4  },
+  { code:'2395', name:'研華',     s1:42,   s2:18,   s3:160,  intensity:6.1  },
+  { code:'3045', name:'台灣大',   s1:38,   s2:16,   s3:140,  intensity:5.4  },
+  { code:'4904', name:'遠傳',     s1:34,   s2:14,   s3:120,  intensity:4.8  },
+  { code:'2408', name:'南亞科',   s1:31,   s2:12,   s3:100,  intensity:8.2  },
+  { code:'2301', name:'光寶科',   s1:28,   s2:11,   s3:90,   intensity:3.2  },
+  { code:'2376', name:'技嘉',     s1:25,   s2:10,   s3:80,   intensity:2.9  },
+  { code:'2337', name:'旺宏',     s1:22,   s2:9,    s3:70,   intensity:4.1  },
+];
+
+const SECTOR_MAP = {
+  '1101':'水泥','1102':'水泥','2002':'鋼鐵','6505':'石化','1301':'石化',
+  '1303':'石化','1326':'石化','2317':'電子','2330':'半導體','2412':'電信',
+  '2303':'半導體','3711':'封測','2882':'金融','2881':'金融','1216':'食品',
+  '2308':'電子','2454':'半導體','2891':'金融','2886':'金融','2884':'金融',
+  '2892':'金融','5880':'金融','2885':'金融','2880':'金融','2883':'金融',
+  '2887':'金融','2890':'金融','2888':'金融','2889':'金融','1402':'紡織',
+  '2207':'汽車','2912':'零售','2801':'金融','1504':'電機','2105':'橡膠',
+  '2049':'機械','6415':'半導體','3034':'IC設計','2379':'IC設計','3008':'光學',
+  '2382':'電腦','2357':'電腦','2353':'電腦','2395':'工業電腦','3045':'電信',
+  '4904':'電信','2408':'記憶體','2301':'電子','2376':'電腦','2337':'記憶體',
+};
+
+const PALETTE = [
+  '#39d353','#00b4d8','#f59e0b','#a78bfa','#ef4444','#60a5fa',
+  '#34d399','#fb923c','#f472b6','#818cf8','#4ade80','#facc15',
+  '#22d3ee','#c084fc','#f87171','#38bdf8','#86efac','#fcd34d',
+];
+
+let topN = 10;
+let pieChart1Inst, pieChart2Inst, barChartInst, lineChartInst;
+
+function getData(n) {
+  return ALL_COMPANIES.slice(0, Math.min(n, ALL_COMPANIES.length));
+}
+
+function updateSlider(v) {
+  topN = parseInt(v);
+  document.getElementById('sliderVal').textContent = v;
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.chart-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'sunburst') renderSunburst();
+}
+
+function destroyIfExists(inst) {
+  if (inst) { try { inst.destroy(); } catch(e){} }
+}
+
+function renderAllCharts() {
+  const d = getData(topN);
+  renderPie1(d);
+  renderPie2();
+  renderBar(d);
+  renderLine(d);
+  renderTable(d);
+  const activePanelId = document.querySelector('.chart-panel.active')?.id;
+  if (activePanelId === 'panel-sunburst') renderSunburst();
+}
+
+// ── Pie 1: 範疇一佔比 ──
+function renderPie1(d) {
+  destroyIfExists(pieChart1Inst);
+  const ctx = document.getElementById('pieChart1').getContext('2d');
+  pieChart1Inst = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: d.map(c => c.code + ' ' + c.name),
+      datasets: [{
+        data: d.map(c => c.s1),
+        backgroundColor: PALETTE.slice(0, d.length),
+        borderColor: '#161b22',
+        borderWidth: 3,
+        hoverOffset: 10,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '58%',
+      plugins: {
+        legend: { position:'right', labels:{ color:'#8b949e', font:{size:11}, boxWidth:12, padding:10 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} 萬噸`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Pie 2: 三範疇總量 ──
+function renderPie2() {
+  destroyIfExists(pieChart2Inst);
+  const ctx = document.getElementById('pieChart2').getContext('2d');
+  pieChart2Inst = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['範疇一（直接排放）','範疇二（能源間接）','範疇三（其他間接）'],
+      datasets: [{
+        data: [17525, 3167, 14442],
+        backgroundColor: ['#39d353','#00b4d8','#f59e0b'],
+        borderColor: '#161b22',
+        borderWidth: 3,
+        hoverOffset: 10,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '58%',
+      plugins: {
+        legend: { position:'bottom', labels:{ color:'#8b949e', font:{size:11}, boxWidth:12, padding:14 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} 萬噸`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Bar ──
+function renderBar(d) {
+  destroyIfExists(barChartInst);
+  const ctx = document.getElementById('barChart').getContext('2d');
+  barChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: d.map(c => c.code),
+      datasets: [
+        { label:'範疇一', data: d.map(c=>c.s1), backgroundColor:'rgba(57,211,83,0.75)', borderRadius:4 },
+        { label:'範疇二', data: d.map(c=>c.s2), backgroundColor:'rgba(0,180,216,0.75)',  borderRadius:4 },
+        { label:'範疇三', data: d.map(c=>c.s3), backgroundColor:'rgba(245,158,11,0.75)', borderRadius:4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels:{ color:'#8b949e', font:{size:11} } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()} 萬噸` } }
+      },
+      scales: {
+        x: { ticks:{ color:'#8b949e', font:{size:10} }, grid:{ color:'rgba(48,54,61,0.5)' } },
+        y: { ticks:{ color:'#8b949e', font:{size:10} }, grid:{ color:'rgba(48,54,61,0.5)' },
+             title:{ display:true, text:'萬噸 CO₂e', color:'#484f58', font:{size:11} } }
+      }
+    }
+  });
+}
+
+// ── Line ──
+function renderLine(d) {
+  destroyIfExists(lineChartInst);
+  const ctx = document.getElementById('lineChart').getContext('2d');
+  lineChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: d.map(c => c.code),
+      datasets: [{
+        label:'排放密集度',
+        data: d.map(c => c.intensity),
+        borderColor: '#39d353',
+        backgroundColor: 'rgba(57,211,83,0.08)',
+        pointBackgroundColor: '#39d353',
+        pointBorderColor: '#161b22',
+        pointRadius: 5,
+        pointHoverRadius: 8,
+        fill: true,
+        tension: 0.35,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels:{ color:'#8b949e', font:{size:11} } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} 噸/百萬元` } }
+      },
+      scales: {
+        x: { ticks:{ color:'#8b949e', font:{size:10} }, grid:{ color:'rgba(48,54,61,0.5)' } },
+        y: { ticks:{ color:'#8b949e', font:{size:10} }, grid:{ color:'rgba(48,54,61,0.5)' },
+             title:{ display:true, text:'噸 CO₂e / 百萬元', color:'#484f58', font:{size:11} } }
+      }
+    }
+  });
+}
+
+// ── Sunburst (Plotly) ──
+function renderSunburst() {
+  const d = getData(topN);
+  const ids=[], labels=[], parents=[], values=[], colors=[];
+  const sectors = [...new Set(d.map(c => SECTOR_MAP[c.code] || '其他'))];
+
+  sectors.forEach((sec, i) => {
+    ids.push('sec_'+sec);
+    labels.push(sec);
+    parents.push('');
+    const total = d.filter(c=>(SECTOR_MAP[c.code]||'其他')===sec).reduce((a,c)=>a+c.s1,0);
+    values.push(total);
+    colors.push(PALETTE[i % PALETTE.length]);
+  });
+
+  d.forEach(c => {
+    const sec = SECTOR_MAP[c.code] || '其他';
+    ids.push(c.code);
+    labels.push(c.code+'\n'+c.name);
+    parents.push('sec_'+sec);
+    values.push(c.s1);
+    colors.push('');
+  });
+
+  Plotly.react('sunburstChart', [{
+    type: 'sunburst',
+    ids, labels, parents, values,
+    branchvalues: 'total',
+    marker: { colors: colors.map((c,i)=> c || PALETTE[i % PALETTE.length]), line:{ color:'#0d1117', width:1.5 } },
+    textfont: { color:'#e6edf3', size:11 },
+    hovertemplate: '<b>%{label}</b><br>範疇一：%{value} 萬噸<extra></extra>',
+  }], {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  'transparent',
+    font: { color:'#e6edf3', family:'Noto Sans TC' },
+    margin: { t:20, b:20, l:20, r:20 },
+  }, { responsive:true, displayModeBar:false });
+}
+
+// ── Table ──
+function renderTable(d) {
+  const maxS1 = d[0]?.s1 || 1;
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = d.map((c, i) => {
+    const pct = ((c.s1 / maxS1) * 100).toFixed(0);
+    const rankClass = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-n';
+    return `<tr>
+      <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+      <td style="color:var(--teal);font-weight:600;">${c.code}</td>
+      <td>${c.name}</td>
+      <td style="color:var(--green-1);font-weight:600;">${c.s1.toLocaleString()}</td>
+      <td style="color:var(--teal);">${c.s2.toLocaleString()}</td>
+      <td style="color:var(--amber);">${c.s3.toLocaleString()}</td>
+      <td>${c.intensity}</td>
+      <td>
+        <div class="bar-inline">
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <span style="font-size:.72rem;color:var(--text-muted);min-width:32px;">${pct}%</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Init ──
+window.addEventListener('DOMContentLoaded', () => {
+  renderAllCharts();
+});
+</script>
+</body>
+</html>
