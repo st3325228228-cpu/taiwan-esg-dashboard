@@ -1,4 +1,4 @@
-# Taiwan ESG Dashboard
+# Taiwan ESG Dashboard 
 
 使用 HTML、CSS、JavaScript、Chart.js 與 Plotly.js 建立的台灣上市公司溫室氣體排放資料視覺化儀表板。
 
